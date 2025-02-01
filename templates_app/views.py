@@ -35,7 +35,6 @@ def generate_template_preview(request, template_id):
     bg_image = Image.open(BytesIO(response.content)).convert("RGBA")
     bg_image = bg_image.resize((template.canvas_width, template.canvas_height), Image.Resampling.LANCZOS)
     
-    # Create a new transparent layer for elements
     element_layer = Image.new('RGBA', (template.canvas_width, template.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(element_layer)
 
@@ -44,17 +43,16 @@ def generate_template_preview(request, template_id):
     except:
         font = ImageFont.load_default()
 
-    # Get elements ordered by z-index
     elements = template.elements.all().order_by('z_index')
     
     for element in elements:
         box = element.box
         
-        # Calculate absolute positions based on percentages
-        box_x = int(box.x * template.canvas_width / 100)
-        box_y = int(box.y * template.canvas_height / 100)
-        box_width = int(box.width * template.canvas_width / 100)
-        box_height = int(box.height * template.canvas_height / 100)
+        # Use pixel values directly
+        box_x = box.x
+        box_y = box.y
+        box_width = box.width
+        box_height = box.height
         
         if element.element_type == "text":
             text = element.content.get("text", "")
@@ -100,8 +98,6 @@ def generate_template_preview(request, template_id):
 
     # Composite the element layer onto the background
     final_image = Image.alpha_composite(bg_image.convert('RGBA'), element_layer)
-    
-    # Convert to response
     img_io = BytesIO()
     final_image.save(img_io, "PNG")
     img_io.seek(0)

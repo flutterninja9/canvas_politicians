@@ -16,33 +16,15 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   Color selectedColor = Colors.black;
   Map<String, dynamic>? selectedElement;
   bool isResizing = false;
+  final GlobalKey _stackKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    print(widget.template);
     editedJson = {
       'editable_elements':
           List<Map<String, dynamic>>.from(widget.template['editable_json'])
     };
-  }
-
-  // Convert percentage to pixels
-  double getPixelX(double percentage) {
-    return percentage * widget.template['canvas_width'] / 100;
-  }
-
-  double getPixelY(double percentage) {
-    return percentage * widget.template['canvas_height'] / 100;
-  }
-
-  // Convert pixels to percentage
-  double getPercentageX(double pixels) {
-    return (pixels * 100) / widget.template['canvas_width'];
-  }
-
-  double getPercentageY(double pixels) {
-    return (pixels * 100) / widget.template['canvas_height'];
   }
 
   Widget buildResizeHandle(
@@ -50,13 +32,12 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
     return Positioned(
       left: position == HandlePosition.topLeft ||
               position == HandlePosition.bottomLeft
-          ? getPixelX(element['box']['x']) - 12
-          : getPixelX(element['box']['x']) + getPixelX(element['box']['width']),
+          ? element['box']['x'] - 12
+          : element['box']['x'] + element['box']['width'],
       top: position == HandlePosition.topLeft ||
               position == HandlePosition.topRight
-          ? getPixelY(element['box']['y']) - 12
-          : getPixelY(element['box']['y']) +
-              getPixelY(element['box']['height']),
+          ? element['box']['y'] - 12
+          : element['box']['y'] + element['box']['height'],
       child: GestureDetector(
         onPanUpdate: (details) {
           setState(() {
@@ -67,34 +48,38 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
 
             if (position == HandlePosition.topLeft ||
                 position == HandlePosition.topRight) {
-              double deltaY = getPercentageY(details.delta.dy);
-              newHeight -= deltaY;
-              newY += deltaY;
+              newHeight -= details.delta.dy;
+              newY += details.delta.dy;
             }
 
             if (position == HandlePosition.bottomLeft ||
                 position == HandlePosition.bottomRight) {
-              newHeight += getPercentageY(details.delta.dy);
+              newHeight += details.delta.dy;
             }
 
             if (position == HandlePosition.topLeft ||
                 position == HandlePosition.bottomLeft) {
-              double deltaX = getPercentageX(details.delta.dx);
-              newWidth -= deltaX;
-              newX += deltaX;
+              newWidth -= details.delta.dx;
+              newX += details.delta.dx;
             }
 
             if (position == HandlePosition.topRight ||
                 position == HandlePosition.bottomRight) {
-              newWidth += getPercentageX(details.delta.dx);
+              newWidth += details.delta.dx;
             }
 
-            // Ensure minimum size
+            // Ensure minimum size and bounds
             if (newWidth >= 5 && newHeight >= 5) {
-              element['box']['width'] = newWidth;
-              element['box']['height'] = newHeight;
-              element['box']['x'] = newX;
-              element['box']['y'] = newY;
+              // Validate bounds
+              if (newX >= 0 &&
+                  newY >= 0 &&
+                  newX + newWidth <= widget.template['canvas_width'] &&
+                  newY + newHeight <= widget.template['canvas_height']) {
+                element['box']['width'] = newWidth;
+                element['box']['height'] = newHeight;
+                element['box']['x'] = newX;
+                element['box']['y'] = newY;
+              }
             }
           });
         },
@@ -104,6 +89,77 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
           decoration: BoxDecoration(
             color: Colors.blue.withOpacity(0.5),
             shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildBoxedElement(Map<String, dynamic> element) {
+    bool isSelected = selectedElement == element;
+
+    return Positioned(
+      left: element['box']['x'].toDouble(),
+      top: element['box']['y'].toDouble(),
+      child: GestureDetector(
+        onTap: () => showEditOptions(context, element),
+        child: Container(
+          width: element['box']['width'].toDouble(),
+          height: element['box']['height'].toDouble(),
+          decoration: BoxDecoration(
+            border:
+                isSelected ? Border.all(color: Colors.blue, width: 2) : null,
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Align(
+                  alignment: element['box']['alignment'] == 'center'
+                      ? Alignment.center
+                      : element['box']['alignment'] == 'right'
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                  child: Draggable(
+                    feedback: Material(
+                      color: Colors.transparent,
+                      child: buildElementWidget(element),
+                    ),
+                    childWhenDragging: Container(),
+                    onDragEnd: (details) {
+                      final RenderBox box = _stackKey.currentContext!
+                          .findRenderObject() as RenderBox;
+                      final localPosition = box.globalToLocal(details.offset);
+
+                      setState(() {
+                        // Ensure the element stays within bounds
+                        double newX = localPosition.dx
+                            .clamp(
+                                0,
+                                widget.template['canvas_width'] -
+                                    element['box']['width'])
+                            .toDouble();
+                        double newY = localPosition.dy
+                            .clamp(
+                                0,
+                                widget.template['canvas_height'] -
+                                    element['box']['height'])
+                            .toDouble();
+
+                        element['box']['x'] = newX;
+                        element['box']['y'] = newY;
+                      });
+                    },
+                    child: buildElementWidget(element),
+                  ),
+                ),
+              ),
+              if (isSelected) ...[
+                buildResizeHandle(element, HandlePosition.topLeft),
+                buildResizeHandle(element, HandlePosition.topRight),
+                buildResizeHandle(element, HandlePosition.bottomLeft),
+                buildResizeHandle(element, HandlePosition.bottomRight),
+              ],
+            ],
           ),
         ),
       ),
@@ -241,59 +297,6 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
         fontWeight: FontWeight.bold,
         color: Color(
             int.parse(element['style']['color'].replaceFirst('#', '0xff'))),
-      ),
-    );
-  }
-
-  Widget buildBoxedElement(Map<String, dynamic> element) {
-    bool isSelected = selectedElement == element;
-
-    return Positioned(
-      left: getPixelX(element['box']['x']),
-      top: getPixelY(element['box']['y']),
-      child: GestureDetector(
-        onTap: () => showEditOptions(context, element),
-        child: Container(
-          width: getPixelX(element['box']['width']),
-          height: getPixelY(element['box']['height']),
-          decoration: BoxDecoration(
-            border:
-                isSelected ? Border.all(color: Colors.blue, width: 2) : null,
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Align(
-                  alignment: element['box']['alignment'] == 'center'
-                      ? Alignment.center
-                      : element['box']['alignment'] == 'right'
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                  child: Draggable(
-                    feedback: Material(
-                      color: Colors.transparent,
-                      child: buildElementWidget(element),
-                    ),
-                    childWhenDragging: Container(),
-                    onDragEnd: (details) {
-                      setState(() {
-                        element['box']['x'] = getPercentageX(details.offset.dx);
-                        element['box']['y'] = getPercentageY(details.offset.dy);
-                      });
-                    },
-                    child: buildElementWidget(element),
-                  ),
-                ),
-              ),
-              if (isSelected) ...[
-                buildResizeHandle(element, HandlePosition.topLeft),
-                buildResizeHandle(element, HandlePosition.topRight),
-                buildResizeHandle(element, HandlePosition.bottomLeft),
-                buildResizeHandle(element, HandlePosition.bottomRight),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }

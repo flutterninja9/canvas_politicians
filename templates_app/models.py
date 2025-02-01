@@ -31,10 +31,10 @@ class Template(models.Model):
 class Box(models.Model):
     """Model to represent a bounding box for template elements"""
     template = models.ForeignKey(Template, on_delete=models.CASCADE, related_name="boxes")
-    x = models.FloatField()  # Left position as percentage of canvas width
-    y = models.FloatField()  # Top position as percentage of canvas height
-    width = models.FloatField()  # Width as percentage of canvas width
-    height = models.FloatField()  # Height as percentage of canvas height
+    x = models.IntegerField()  # Left position in pixels
+    y = models.IntegerField()  # Top position in pixels
+    width = models.IntegerField()  # Width in pixels
+    height = models.IntegerField()  # Height in pixels
     alignment = models.CharField(
         max_length=20,
         choices=[
@@ -44,6 +44,17 @@ class Box(models.Model):
         ],
         default="left"
     )
+
+    def clean(self):
+        # Validate that box stays within canvas bounds
+        if self.x < 0:
+            self.x = 0
+        if self.y < 0:
+            self.y = 0
+        if self.x + self.width > self.template.canvas_width:
+            self.x = self.template.canvas_width - self.width
+        if self.y + self.height > self.template.canvas_height:
+            self.y = self.template.canvas_height - self.height
 
 class TemplateElement(models.Model):
     """Model to represent individual elements within a template"""
