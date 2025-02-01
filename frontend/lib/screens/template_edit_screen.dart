@@ -323,6 +323,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
           width: widget.template['canvas_width'].toDouble(),
           height: widget.template['canvas_height'].toDouble(),
           child: Stack(
+            key: _stackKey,
             children: [
               Image.network(
                 widget.template['image'],
