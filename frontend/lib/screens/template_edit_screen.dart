@@ -20,8 +20,8 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   void initState() {
     super.initState();
     editedJson = {
-      'elements': List<Map<String, dynamic>>.from(
-          widget.template['editable_json']['elements'])
+      'editable_json':
+          List<Map<String, dynamic>>.from(widget.template['editable_json'])
     };
   }
 
@@ -95,44 +95,80 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   }
 
   void saveChanges() {
+    print(widget.template);
+    print(editedJson);
     apiService.saveEdit(widget.template['id'], editedJson);
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text("Changes Saved!")));
     Navigator.of(context).push(MaterialPageRoute(
         builder: (context) => TemplatePreviewScreen(
-            editedJson: editedJson, templateId: widget.template['id'])));
+            editedJson: editedJson,
+            templateId: widget.template['template_id'])));
   }
 
   @override
   Widget build(BuildContext context) {
+    // Get the canvas dimensions from the template
+    double canvasWidth = widget.template['canvas_width'].toDouble();
+    double canvasHeight = widget.template['canvas_height'].toDouble();
+
     return Scaffold(
       appBar: AppBar(title: const Text("Edit Template")),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          // Get the image dimensions from the template
-          double imageWidth = widget.template['image_width'].toDouble();
-          double imageHeight = widget.template['image_height'].toDouble();
-
-          // Calculate scaling factor to fit screen while maintaining aspect ratio
-          double scale = constraints.maxWidth / imageWidth;
-          double scaledHeight = imageHeight * scale;
-
-          return Stack(
+      body: InteractiveViewer(
+        boundaryMargin: EdgeInsets.all(double.infinity), // Infinite canvas
+        minScale: 0.1, // Minimum zoom level
+        maxScale: 4.0, // Maximum zoom level
+        constrained: false,
+        child: SizedBox(
+          width: canvasWidth,
+          height: canvasHeight,
+          child: Stack(
             children: [
-              Center(
-                child: Image.network(
-                  widget.template['image'],
-                  width: imageWidth * scale,
-                  height: scaledHeight,
-                  fit: BoxFit.contain,
-                ),
+              // Background Image
+              Image.network(
+                widget.template['image'],
+                width: canvasWidth,
+                height: canvasHeight,
+                fit: BoxFit.cover,
               ),
-              ...editedJson['elements'].asMap().entries.map((entry) {
-                int index = entry.key;
-                var element = entry.value;
+              // Editable Elements
+              ...editedJson['editable_json'].map((element) {
+                if (element['type'] == 'image') {
+                  return Positioned(
+                    left: element['position']['x'].toDouble(),
+                    top: element['position']['y'].toDouble(),
+                    child: Draggable(
+                      feedback: Material(
+                        color: Colors.transparent,
+                        child: Image.network(
+                          element['url'],
+                          width: element['size']['width'].toDouble(),
+                          height: element['size']['height'].toDouble(),
+                        ),
+                      ),
+                      childWhenDragging: Image.network(
+                        element['url'],
+                        width: element['size']['width'].toDouble(),
+                        height: element['size']['height'].toDouble(),
+                      ),
+                      onDragEnd: (details) {
+                        setState(() {
+                          element['position']['x'] = details.offset.dx;
+                          element['position']['y'] = details.offset.dy;
+                        });
+                      },
+                      child: Image.network(
+                        element['url'],
+                        width: element['size']['width'].toDouble(),
+                        height: element['size']['height'].toDouble(),
+                      ),
+                    ),
+                  );
+                }
+
                 return Positioned(
-                  left: imageWidth * element['x'] * scale,
-                  top: imageHeight * element['y'] * scale,
+                  left: element['position']['x'].toDouble(),
+                  top: element['position']['y'].toDouble(),
                   child: GestureDetector(
                     onTap: () => showEditOptions(context, element),
                     child: Draggable(
@@ -141,7 +177,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                         child: Text(
                           element['text'] ?? 'Default Text',
                           style: TextStyle(
-                            fontSize: 20 * scale, // Scale font size too
+                            fontSize: element['font_size'].toDouble(),
                             fontWeight: FontWeight.bold,
                             color: Color(int.parse(
                                 element['color'].replaceFirst('#', '0xff'))),
@@ -151,16 +187,14 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                       childWhenDragging: Container(),
                       onDragEnd: (details) {
                         setState(() {
-                          element['x'] =
-                              details.offset.dx / (imageWidth * scale);
-                          element['y'] =
-                              details.offset.dy / (imageHeight * scale);
+                          element['position']['x'] = details.offset.dx;
+                          element['position']['y'] = details.offset.dy;
                         });
                       },
                       child: Text(
                         element['text'] ?? 'Default Text',
                         style: TextStyle(
-                          fontSize: 20 * scale,
+                          fontSize: element['font_size'].toDouble(),
                           fontWeight: FontWeight.bold,
                           color: Color(int.parse(
                               element['color'].replaceFirst('#', '0xff'))),
@@ -170,17 +204,13 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                   ),
                 );
               }).toList(),
-              Positioned(
-                bottom: 20,
-                left: 20,
-                child: ElevatedButton(
-                  onPressed: saveChanges,
-                  child: const Text("Save"),
-                ),
-              ),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: saveChanges,
+        child: const Icon(Icons.save),
       ),
     );
   }

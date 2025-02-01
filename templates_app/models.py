@@ -15,16 +15,15 @@ class Template(models.Model):
     is_premium = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     editable_json = models.JSONField(default=dict)
-    # Add fields for image dimensions
-    image_width = models.IntegerField(default=0)
-    image_height = models.IntegerField(default=0)
+    canvas_width = models.IntegerField(default=1080)  # Default canvas width
+    canvas_height = models.IntegerField(default=1920)  # Default canvas height
 
     def save(self, *args, **kwargs):
-        # Update image dimensions on save if image exists
-        if self.image and not self.image_width:
+        # Update canvas dimensions if image exists
+        if self.image and (not self.canvas_width or not self.canvas_height):
             with Image.open(self.image) as img:
-                self.image_width = img.width
-                self.image_height = img.height
+                self.canvas_width = img.width
+                self.canvas_height = img.height
         super().save(*args, **kwargs)
 
     def __str__(self):
