@@ -16,6 +16,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   Color selectedColor = Colors.black;
   Map<String, dynamic>? selectedElement;
   bool isResizing = false;
+  double scale = 1.0;
   final GlobalKey _stackKey = GlobalKey();
 
   @override
@@ -120,9 +121,12 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
                   child: Draggable(
-                    feedback: Material(
-                      color: Colors.transparent,
-                      child: buildElementWidget(element),
+                    feedback: Transform.scale(
+                      scale: 1 / scale,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: buildElementWidget(element),
+                      ),
                     ),
                     childWhenDragging: Container(),
                     onDragEnd: (details) {
@@ -317,6 +321,11 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
       body: InteractiveViewer(
         boundaryMargin: const EdgeInsets.all(double.infinity),
         minScale: 0.1,
+        onInteractionUpdate: (details) {
+          setState(() {
+            scale = details.scale;
+          });
+        },
         maxScale: 4.0,
         constrained: false,
         child: SizedBox(
