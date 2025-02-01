@@ -25,67 +25,84 @@ class TemplateEditCreateView(generics.CreateAPIView):
 @csrf_exempt
 def generate_template_preview(request, template_id):
     template = get_object_or_404(Template, id=template_id)
-
-    # Ensure JSON is correctly parsed
-    if isinstance(template.editable_json, dict):
-        editable_elements = template.editable_json
-    else:
-        editable_elements = json.loads(template.editable_json)
-
-    print("Editable Elements:", editable_elements)
-
+    
     # Load background image
     image_url = f'http://192.168.1.6:8000/media/{template.image}'
     response = requests.get(image_url)
     if response.status_code != 200:
         return HttpResponse("Failed to load template image", status=500)
     
-    # Open image and resize to canvas dimensions
-    bg_image = Image.open(BytesIO(response.content)).convert("RGB")
+    bg_image = Image.open(BytesIO(response.content)).convert("RGBA")
     bg_image = bg_image.resize((template.canvas_width, template.canvas_height), Image.Resampling.LANCZOS)
     
-    draw = ImageDraw.Draw(bg_image)
+    # Create a new transparent layer for elements
+    element_layer = Image.new('RGBA', (template.canvas_width, template.canvas_height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(element_layer)
 
-    # Try loading a font with size relative to canvas height
-    font_size = 48  # Fixed font size as per the template
     try:
-        font = ImageFont.truetype("arial.ttf", font_size)
+        font = ImageFont.truetype("arial.ttf", 48)
     except:
-        try:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
-        except:
-            font = ImageFont.load_default()
+        font = ImageFont.load_default()
 
-    # Draw editable elements
-    for element in editable_elements.get("editable_elements", []):
-        try:
-            # Use absolute positioning based on canvas dimensions
-            x = element["position"]["x"]
-            y = element["position"]["y"]
-            text = element.get("text", "")
-            hex_color = element.get("color", "#000000")
-
-            # Convert hex color to RGB
-            rgb_color = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
-
-            # Get text dimensions for centering
+    # Get elements ordered by z-index
+    elements = template.elements.all().order_by('z_index')
+    
+    for element in elements:
+        box = element.box
+        
+        # Calculate absolute positions based on percentages
+        box_x = int(box.x * template.canvas_width / 100)
+        box_y = int(box.y * template.canvas_height / 100)
+        box_width = int(box.width * template.canvas_width / 100)
+        box_height = int(box.height * template.canvas_height / 100)
+        
+        if element.element_type == "text":
+            text = element.content.get("text", "")
+            font_size = element.style.get("font_size", 48)
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except:
+                font = ImageFont.load_default()
+            
+            # Calculate text dimensions
             bbox = draw.textbbox((0, 0), text, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
             
-            # Center text at position
-            text_x = x - (text_width // 2)
-            text_y = y - (text_height // 2)
-
-            print(f"Placing text at: ({text_x}, {text_y}) with content: {text}")
-
+            # Calculate text position based on box alignment
+            if box.alignment == "center":
+                text_x = box_x + (box_width - text_width) // 2
+            elif box.alignment == "right":
+                text_x = box_x + box_width - text_width
+            else:  # left alignment
+                text_x = box_x
+            
+            # Vertically center the text in the box
+            text_y = box_y + (box_height - text_height) // 2
+            
             # Draw text
+            color = element.style.get("color", "#000000")
+            rgb_color = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
             draw.text((text_x, text_y), text, fill=rgb_color, font=font)
-        except Exception as e:
-            print("Error drawing element:", e)
+        
+        elif element.element_type == "image":
+            # Handle image elements
+            image_url = element.content.get("url")
+            if image_url:
+                try:
+                    response = requests.get(image_url)
+                    if response.status_code == 200:
+                        element_image = Image.open(BytesIO(response.content))
+                        element_image = element_image.resize((box_width, box_height), Image.Resampling.LANCZOS)
+                        element_layer.paste(element_image, (box_x, box_y))
+                except Exception as e:
+                    print(f"Error processing image element: {e}")
 
-    # Convert image to response
+    # Composite the element layer onto the background
+    final_image = Image.alpha_composite(bg_image.convert('RGBA'), element_layer)
+    
+    # Convert to response
     img_io = BytesIO()
-    bg_image.save(img_io, "PNG")
+    final_image.save(img_io, "PNG")
     img_io.seek(0)
     return HttpResponse(img_io.getvalue(), content_type="image/png")
