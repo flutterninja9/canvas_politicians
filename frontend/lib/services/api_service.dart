@@ -26,6 +26,30 @@ class ApiService {
     return "$baseUrl/preview/$templateId/";
   }
 
+  Future<String> uploadImage(Uint8List imageBytes, String fileName) async {
+    try {
+      FormData formData = FormData.fromMap({
+        'image': MultipartFile.fromBytes(
+          imageBytes,
+          filename: fileName,
+        ),
+      });
+
+      final response = await _dio.post(
+        "$baseUrl/upload-image/",
+        data: formData,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data['url'];
+      } else {
+        throw Exception('Failed to upload image');
+      }
+    } catch (e) {
+      throw Exception('Error uploading image: $e');
+    }
+  }
+
   Future<List<int>> generatePreviewImage(
     int templateId,
     Map<String, dynamic> editedJson,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/utils/image_upload_dialog.dart';
 
 class ElementCreationSidebar extends StatelessWidget {
   final bool isExpanded;
@@ -53,6 +54,7 @@ class ElementCreationSidebar extends StatelessWidget {
                   const SizedBox(height: 8),
                 ],
                 _buildDraggableElement(
+                  context: context,
                   icon: Icons.title,
                   label: 'Heading',
                   isExpanded: isExpanded,
@@ -75,6 +77,7 @@ class ElementCreationSidebar extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _buildDraggableElement(
+                  context: context,
                   icon: Icons.text_fields,
                   label: 'Body Text',
                   isExpanded: isExpanded,
@@ -104,6 +107,7 @@ class ElementCreationSidebar extends StatelessWidget {
                   const SizedBox(height: 8),
                 ],
                 _buildDraggableElement(
+                  context: context,
                   icon: Icons.image,
                   label: 'Image',
                   isExpanded: isExpanded,
@@ -132,12 +136,44 @@ class ElementCreationSidebar extends StatelessWidget {
   }
 
   Widget _buildDraggableElement({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required bool isExpanded,
     required Map<String, dynamic> element,
     required Function(Map<String, dynamic>) onCreateElement,
   }) {
+    if (element['type'] == 'image') {
+      return InkWell(
+        onTap: () async {
+          final url = await showImageUploadDialog(context);
+          print('Image URL: $url');
+          if (url != null) {
+            final newElement = Map<String, dynamic>.from(element);
+            newElement['content']['url'] = url;
+            onCreateElement(newElement);
+          }
+        },
+        child: Container(
+          padding: EdgeInsets.all(isExpanded ? 12 : 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 24),
+              if (isExpanded) ...[
+                const SizedBox(width: 12),
+                Expanded(child: Text(label)),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     return Draggable<Map<String, dynamic>>(
       data: element,
       feedback: Material(
