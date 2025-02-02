@@ -194,8 +194,9 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                   onChanged: (text) {
                     double? newValue = double.tryParse(text);
                     if (newValue != null) {
-                      if (min != null)
+                      if (min != null) {
                         newValue = newValue.clamp(min, max ?? double.infinity);
+                      }
                       onChanged(newValue);
                     }
                   },
@@ -206,8 +207,9 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                 icon: const Icon(Icons.remove),
                 onPressed: () {
                   double newValue = value - 1;
-                  if (min != null)
+                  if (min != null) {
                     newValue = newValue.clamp(min, max ?? double.infinity);
+                  }
                   onChanged(newValue);
                 },
               ),
@@ -215,9 +217,10 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                 icon: const Icon(Icons.add),
                 onPressed: () {
                   double newValue = value + 1;
-                  if (max != null)
+                  if (max != null) {
                     newValue =
                         newValue.clamp(min ?? double.negativeInfinity, max);
+                  }
                   onChanged(newValue);
                 },
               ),
