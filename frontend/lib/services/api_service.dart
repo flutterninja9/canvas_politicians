@@ -36,7 +36,7 @@ class ApiService {
       });
 
       final response = await _dio.post(
-        "$baseUrl/upload-image/",
+        "$baseUrl/upload/",
         data: formData,
       );
 

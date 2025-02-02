@@ -77,7 +77,7 @@ Future<String?> showImageUploadDialog(BuildContext context) async {
                         );
 
                         // Close loading indicator and dialog
-                        Navigator.pop(context); // Close loading
+                        // Navigator.pop(context); // Close loading
                         Navigator.pop(context); // Close upload dialog
                         Navigator.pop(context, uploadedUrl); // Return URL
                       } catch (e) {

@@ -23,6 +23,21 @@ class TemplateEditCreateView(generics.CreateAPIView):
     serializer_class = TemplateEditSerializer
 
 @csrf_exempt
+def upload_image(request):
+    if request.method == "POST":
+        image = request.FILES.get("image")
+        if image:
+            # Save the image to the media folder
+            with open(f"media/{image.name}", "wb") as f:
+                f.write(image.read())
+            image_url = f"http://{request.get_host()}/media/{image.name}"
+            return HttpResponse(json.dumps({"url": image_url}), content_type="application/json")
+        else:
+            return HttpResponse("No image found in the request", status=400)
+    return HttpResponse("Invalid request method", status=405)
+
+
+@csrf_exempt
 def generate_template_preview(request, template_id):
     template = get_object_or_404(Template, id=template_id)
     
