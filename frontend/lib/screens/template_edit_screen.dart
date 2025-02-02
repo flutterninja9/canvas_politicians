@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:frontend/screens/template_preview_screen.dart';
+import 'package:frontend/widgets/element_creation_sidebar.dart';
 import '../services/api_service.dart';
 
 class TemplateEditScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class TemplateEditScreen extends StatefulWidget {
 class _TemplateEditScreenState extends State<TemplateEditScreen> {
   late Map<String, dynamic> editedJson;
   Color selectedColor = Colors.black;
+  bool isCreationSidebarExpanded = true;
   Map<String, dynamic>? selectedElement;
   bool isResizing = false;
   late final TransformationController transformationController;
@@ -33,6 +35,13 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   void dispose() {
     transformationController.dispose();
     super.dispose();
+  }
+
+  void _handleNewElement(Map<String, dynamic> elementData) {
+    setState(() {
+      editedJson['editable_elements'].add(elementData);
+      selectedElement = elementData; // Automatically select the new element
+    });
   }
 
   Widget buildPropertySidebar() {
@@ -524,33 +533,67 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
       appBar: AppBar(elevation: 0),
       body: Row(
         children: [
+          // Add the creation sidebar
+          ElementCreationSidebar(
+            isExpanded: isCreationSidebarExpanded,
+            onToggle: () => setState(() {
+              isCreationSidebarExpanded = !isCreationSidebarExpanded;
+            }),
+            onCreateElement: _handleNewElement,
+          ),
+          // Wrap the InteractiveViewer in a DragTarget
           Expanded(
-            child: InteractiveViewer(
-              boundaryMargin: const EdgeInsets.all(double.infinity),
-              transformationController: transformationController,
-              minScale: 0.1,
-              maxScale: 4.0,
-              constrained: false,
-              child: SizedBox(
-                width: widget.template['canvas_width'].toDouble(),
-                height: widget.template['canvas_height'].toDouble(),
-                child: Stack(
-                  key: _stackKey,
-                  children: [
-                    Image.network(
-                      widget.template['image'],
-                      width: widget.template['canvas_width'].toDouble(),
-                      height: widget.template['canvas_height'].toDouble(),
-                      fit: BoxFit.cover,
+            child: DragTarget<Map<String, dynamic>>(
+              onAcceptWithDetails: (details) {
+                final RenderBox box =
+                    _stackKey.currentContext!.findRenderObject() as RenderBox;
+                final localPosition = box.globalToLocal(details.offset);
+
+                final elementData = details.data;
+                elementData['box']['x'] = localPosition.dx.clamp(
+                  0,
+                  widget.template['canvas_width'] - elementData['box']['width'],
+                );
+                elementData['box']['y'] = localPosition.dy.clamp(
+                  0,
+                  widget.template['canvas_height'] -
+                      elementData['box']['height'],
+                );
+
+                _handleNewElement(elementData);
+              },
+              builder: (context, candidateData, rejectedData) {
+                return InteractiveViewer(
+                  // Your existing InteractiveViewer configuration
+                  boundaryMargin: const EdgeInsets.all(double.infinity),
+                  transformationController: transformationController,
+                  minScale: 0.1,
+                  maxScale: 4.0,
+                  constrained: false,
+                  child: SizedBox(
+                    width: widget.template['canvas_width'].toDouble(),
+                    height: widget.template['canvas_height'].toDouble(),
+                    child: Stack(
+                      key: _stackKey,
+                      children: [
+                        Image.network(
+                          widget.template['image'],
+                          width: widget.template['canvas_width'].toDouble(),
+                          height: widget.template['canvas_height'].toDouble(),
+                          fit: BoxFit.cover,
+                        ),
+                        ...editedJson['editable_elements']
+                            .map<Widget>(
+                                (element) => buildBoxedElement(element))
+                            .toList(),
+                      ],
                     ),
-                    ...editedJson['editable_elements']
-                        .map<Widget>((element) => buildBoxedElement(element))
-                        .toList(),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
+          // Your existing property sidebar
           buildPropertySidebar(),
         ],
       ),
