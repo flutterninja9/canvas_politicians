@@ -35,6 +35,304 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
     super.dispose();
   }
 
+  Widget buildPropertySidebar() {
+    if (selectedElement == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: 300,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            offset: const Offset(-2, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[100],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Element Properties',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => setState(() => selectedElement = null),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Position Section
+                _buildSectionTitle('Position & Size'),
+                _buildNumberInput(
+                  'X Position',
+                  selectedElement!['box']['x'],
+                  (value) =>
+                      setState(() => selectedElement!['box']['x'] = value),
+                  min: 0,
+                  max: widget.template['canvas_width'] -
+                      selectedElement!['box']['width'],
+                ),
+                _buildNumberInput(
+                  'Y Position',
+                  selectedElement!['box']['y'],
+                  (value) =>
+                      setState(() => selectedElement!['box']['y'] = value),
+                  min: 0,
+                  max: widget.template['canvas_height'] -
+                      selectedElement!['box']['height'],
+                ),
+                _buildNumberInput(
+                  'Width',
+                  selectedElement!['box']['width'],
+                  (value) =>
+                      setState(() => selectedElement!['box']['width'] = value),
+                  min: 20,
+                  max: widget.template['canvas_width'] -
+                      selectedElement!['box']['x'],
+                ),
+                _buildNumberInput(
+                  'Height',
+                  selectedElement!['box']['height'],
+                  (value) =>
+                      setState(() => selectedElement!['box']['height'] = value),
+                  min: 20,
+                  max: widget.template['canvas_height'] -
+                      selectedElement!['box']['y'],
+                ),
+
+                // Alignment Section
+                _buildSectionTitle('Alignment'),
+                _buildAlignmentSelector(),
+
+                // Style Section
+                _buildSectionTitle('Style'),
+                if (selectedElement!['type'] == 'text') ...[
+                  _buildNumberInput(
+                    'Font Size',
+                    selectedElement!['style']['font_size'],
+                    (value) => setState(
+                        () => selectedElement!['style']['font_size'] = value),
+                    min: 8,
+                    max: 200,
+                  ),
+                  _buildColorPicker(),
+                  _buildTextInput(
+                    'Text Content',
+                    selectedElement!['content']['text'],
+                    (value) => setState(
+                        () => selectedElement!['content']['text'] = value),
+                  ),
+                ],
+
+                if (selectedElement!['type'] == 'image') ...[
+                  _buildTextInput(
+                    'Image URL',
+                    selectedElement!['content']['url'],
+                    (value) => setState(
+                        () => selectedElement!['content']['url'] = value),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildNumberInput(
+    String label,
+    double value,
+    Function(double) onChanged, {
+    double? min,
+    double? max,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  initialValue: value.toStringAsFixed(0),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (text) {
+                    double? newValue = double.tryParse(text);
+                    if (newValue != null) {
+                      if (min != null)
+                        newValue = newValue.clamp(min, max ?? double.infinity);
+                      onChanged(newValue);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: () {
+                  double newValue = value - 1;
+                  if (min != null)
+                    newValue = newValue.clamp(min, max ?? double.infinity);
+                  onChanged(newValue);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () {
+                  double newValue = value + 1;
+                  if (max != null)
+                    newValue =
+                        newValue.clamp(min ?? double.negativeInfinity, max);
+                  onChanged(newValue);
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextInput(
+      String label, String value, Function(String) onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 4),
+          TextFormField(
+            initialValue: value,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorPicker() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Color'),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: const Text('Pick a color'),
+                    content: BlockPicker(
+                      pickerColor: Color(
+                        int.parse(selectedElement!['style']['color']
+                            .replaceFirst('#', '0xff')),
+                      ),
+                      onColorChanged: (color) {
+                        setState(() {
+                          selectedElement!['style']['color'] =
+                              '#${color.value.toRadixString(16).substring(2)}';
+                        });
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: Color(
+                  int.parse(selectedElement!['style']['color']
+                      .replaceFirst('#', '0xff')),
+                ),
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlignmentSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'left',
+                  icon: Icon(Icons.format_align_left),
+                ),
+                ButtonSegment(
+                  value: 'center',
+                  icon: Icon(Icons.format_align_center),
+                ),
+                ButtonSegment(
+                  value: 'right',
+                  icon: Icon(Icons.format_align_right),
+                ),
+              ],
+              selected: {selectedElement!['box']['alignment']},
+              onSelectionChanged: (Set<String> newSelection) {
+                setState(() {
+                  selectedElement!['box']['alignment'] = newSelection.first;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget buildResizeHandle(
       Map<String, dynamic> element, HandlePosition position) {
     return Positioned(
@@ -110,7 +408,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
       left: element['box']['x'].toDouble(),
       top: element['box']['y'].toDouble(),
       child: GestureDetector(
-        onTap: () => showEditOptions(context, element),
+        onTap: () => setSelectedElement(context, element),
         child: Container(
           width: element['box']['width'].toDouble(),
           height: element['box']['height'].toDouble(),
@@ -182,120 +480,11 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
     );
   }
 
-  void showEditOptions(BuildContext context, Map<String, dynamic> element) {
+  void setSelectedElement(
+    BuildContext context,
+    Map<String, dynamic> element,
+  ) {
     setState(() => selectedElement = element);
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text("Change Text"),
-              trailing: const Icon(Icons.text_fields),
-              onTap: () async {
-                String? newText = await showDialog(
-                  context: context,
-                  builder: (context) {
-                    TextEditingController controller =
-                        TextEditingController(text: element['content']['text']);
-                    return AlertDialog(
-                      title: const Text("Edit Text"),
-                      content: TextField(controller: controller),
-                      actions: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pop(context, controller.text),
-                          child: const Text("Save"),
-                        ),
-                      ],
-                    );
-                  },
-                );
-                if (newText != null) {
-                  setState(() {
-                    element['content']['text'] = newText;
-                  });
-                }
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text("Change Color"),
-              trailing: const Icon(Icons.color_lens),
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text("Pick a Color"),
-                      content: BlockPicker(
-                        pickerColor: selectedColor,
-                        onColorChanged: (color) {
-                          setState(() {
-                            element['style']['color'] =
-                                "#${color.value.toRadixString(16)}";
-                          });
-                          Navigator.pop(context);
-                        },
-                      ),
-                    );
-                  },
-                );
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: Text("Alignment: ${element['box']['alignment']}"),
-              trailing: const Icon(Icons.format_align_center),
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text("Choose Alignment"),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            title: const Text("Left"),
-                            onTap: () {
-                              setState(() {
-                                element['box']['alignment'] = 'left';
-                              });
-                              Navigator.pop(context);
-                            },
-                          ),
-                          ListTile(
-                            title: const Text("Center"),
-                            onTap: () {
-                              setState(() {
-                                element['box']['alignment'] = 'center';
-                              });
-                              Navigator.pop(context);
-                            },
-                          ),
-                          ListTile(
-                            title: const Text("Right"),
-                            onTap: () {
-                              setState(() {
-                                element['box']['alignment'] = 'right';
-                              });
-                              Navigator.pop(context);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Widget buildElementWidget(Map<String, dynamic> element) {
@@ -329,31 +518,38 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Template")),
-      body: InteractiveViewer(
-        boundaryMargin: const EdgeInsets.all(double.infinity),
-        transformationController: transformationController,
-        minScale: 0.1,
-        maxScale: 4.0,
-        constrained: false,
-        child: SizedBox(
-          width: widget.template['canvas_width'].toDouble(),
-          height: widget.template['canvas_height'].toDouble(),
-          child: Stack(
-            key: _stackKey,
-            children: [
-              Image.network(
-                widget.template['image'],
+      appBar: AppBar(elevation: 0),
+      body: Row(
+        children: [
+          Expanded(
+            child: InteractiveViewer(
+              boundaryMargin: const EdgeInsets.all(double.infinity),
+              transformationController: transformationController,
+              minScale: 0.1,
+              maxScale: 4.0,
+              constrained: false,
+              child: SizedBox(
                 width: widget.template['canvas_width'].toDouble(),
                 height: widget.template['canvas_height'].toDouble(),
-                fit: BoxFit.cover,
+                child: Stack(
+                  key: _stackKey,
+                  children: [
+                    Image.network(
+                      widget.template['image'],
+                      width: widget.template['canvas_width'].toDouble(),
+                      height: widget.template['canvas_height'].toDouble(),
+                      fit: BoxFit.cover,
+                    ),
+                    ...editedJson['editable_elements']
+                        .map<Widget>((element) => buildBoxedElement(element))
+                        .toList(),
+                  ],
+                ),
               ),
-              ...editedJson['editable_elements']
-                  .map<Widget>((element) => buildBoxedElement(element))
-                  .toList(),
-            ],
+            ),
           ),
-        ),
+          buildPropertySidebar(),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: saveChanges,
