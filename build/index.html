@@ -1,0 +1,297 @@
+<!-- editor.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background: #f0f0f0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        .editor-container {
+            display: flex;
+            flex: 1;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-right: 1px solid #ddd;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: #e0e0e0;
+            overflow: auto;
+        }
+
+        .property-panel {
+            width: 300px;
+            background: white;
+            border-left: 1px solid #ddd;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .toolbar {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            background: white;
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #f5f5f5;
+        }
+
+        button.active {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            color: #1976d2;
+        }
+
+        .element-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+        }
+
+        .property-group {
+            margin-bottom: 16px;
+        }
+
+        .property-group h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .property-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        input, select {
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="number"] {
+            width: 80px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+        }
+
+        select {
+            width: 100%;
+        }
+
+        #canvas {
+            border: 1px solid #ccc;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="sidebar">
+            <h3>Add Elements</h3>
+            <button class="element-button" onclick="addText()">
+                <i data-feather="type"></i>
+                Add Text
+            </button>
+            <button class="element-button" onclick="uploadImage()">
+                <i data-feather="image"></i>
+                Add Image
+            </button>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="property-panel" id="propertyPanel">
+            <div class="property-group">
+                <h3>Position & Size</h3>
+                <div class="property-row">
+                    <input type="number" id="xPos" placeholder="X" onchange="updateSelectedObject('left', this.value)">
+                    <input type="number" id="yPos" placeholder="Y" onchange="updateSelectedObject('top', this.value)">
+                </div>
+                <div class="property-row">
+                    <input type="number" id="width" placeholder="Width" onchange="updateSelectedObject('width', this.value)">
+                    <input type="number" id="height" placeholder="Height" onchange="updateSelectedObject('height', this.value)">
+                </div>
+            </div>
+
+            <div class="property-group" id="textProperties" style="display: none;">
+                <h3>Text Properties</h3>
+                <div class="property-row">
+                    <input type="text" id="textContent" placeholder="Text" onchange="updateSelectedObject('text', this.value)">
+                </div>
+                <div class="property-row">
+                    <input type="number" id="fontSize" placeholder="Font Size" onchange="updateSelectedObject('fontSize', this.value)">
+                    <input type="color" id="textColor" onchange="updateSelectedObject('fill', this.value)">
+                </div>
+                <div class="property-row">
+                    <select id="textAlign" onchange="updateSelectedObject('textAlign', this.value)">
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    <script>
+        // Initialize Feather Icons
+        feather.replace();
+
+        // Initialize Fabric.js canvas
+        const canvas = new fabric.Canvas('canvas', {
+            width: 600,
+            height: 800,
+            backgroundColor: 'white'
+        });
+
+        // Load template background
+        fabric.Image.fromURL('template_background.jpg', function(img) {
+            img.scaleToWidth(canvas.width);
+            canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+        });
+
+        // Track selected object
+        let selectedObject = null;
+        canvas.on('selection:created', updatePropertyPanel);
+        canvas.on('selection:updated', updatePropertyPanel);
+        canvas.on('selection:cleared', () => {
+            selectedObject = null;
+            document.getElementById('textProperties').style.display = 'none';
+        });
+
+        function addText() {
+            const text = new fabric.IText('New Text', {
+                left: 50,
+                top: 50,
+                fontSize: 20,
+                fill: '#000000'
+            });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+        }
+
+        function uploadImage() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fabric.Image.fromURL(event.target.result, function(img) {
+                        img.scaleToWidth(200);
+                        canvas.add(img);
+                        canvas.setActiveObject(img);
+                    });
+                };
+                reader.readAsDataURL(file);
+            };
+            input.click();
+        }
+
+        function updatePropertyPanel(e) {
+            selectedObject = e.selected[0];
+            const isText = selectedObject instanceof fabric.IText;
+            
+            // Update position and size inputs
+            document.getElementById('xPos').value = Math.round(selectedObject.left);
+            document.getElementById('yPos').value = Math.round(selectedObject.top);
+            document.getElementById('width').value = Math.round(selectedObject.width * selectedObject.scaleX);
+            document.getElementById('height').value = Math.round(selectedObject.height * selectedObject.scaleY);
+
+            // Show/hide text properties
+            const textProperties = document.getElementById('textProperties');
+            textProperties.style.display = isText ? 'block' : 'none';
+
+            if (isText) {
+                document.getElementById('textContent').value = selectedObject.text;
+                document.getElementById('fontSize').value = selectedObject.fontSize;
+                document.getElementById('textColor').value = selectedObject.fill;
+                document.getElementById('textAlign').value = selectedObject.textAlign;
+            }
+        }
+
+        function updateSelectedObject(property, value) {
+            if (!selectedObject) return;
+
+            if (property === 'width' || property === 'height') {
+                selectedObject.set('scale' + (property === 'width' ? 'X' : 'Y'), value / selectedObject[property]);
+            } else {
+                selectedObject.set(property, value);
+            }
+            
+            canvas.renderAll();
+        }
+
+        // Communication with Flutter
+        function getEditorState() {
+            const json = canvas.toJSON();
+            // Post message to Flutter
+            window.flutter_inappwebview?.postMessage(JSON.stringify({
+                type: 'editorState',
+                data: json
+            }));
+        }
+
+        // Listen for messages from Flutter
+        window.addEventListener('message', function(event) {
+            const message = JSON.parse(event.data);
+            switch (message.type) {
+                case 'loadTemplate':
+                    canvas.loadFromJSON(message.data, canvas.renderAll.bind(canvas));
+                    break;
+                case 'getState':
+                    getEditorState();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
