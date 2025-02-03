@@ -7,9 +7,9 @@ class PlatformEditor extends StatefulWidget {
   final Map<String, dynamic> template;
 
   const PlatformEditor({
-    Key? key,
+    super.key,
     required this.template,
-  }) : super(key: key);
+  });
 
   @override
   State<PlatformEditor> createState() => _PlatformEditorState();
@@ -65,7 +65,46 @@ class _PlatformEditorState extends State<PlatformEditor> {
 
   // Rest of the implementation...
   void _showAddMenu() {
-    // Implementation
+    // show a modal bottom sheet with options
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        children: [
+          ListTile(
+            title: const Text('Add Text'),
+            onTap: () {
+              _sendToEditor('text', null);
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Add Image'),
+            onTap: () {
+              _sendToEditor('image', null);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendToEditor(String type, Map<String, dynamic>? data) {
+    final message = {
+      'type': type,
+      'data': data,
+    };
+
+    if (type == "text") {
+      _controller?.addText(
+        text: 'New Text',
+        fontSize: 24,
+        color: '#000000',
+      );
+    } else {
+      _controller?.addImage();
+    }
   }
 
   void _saveTemplate() {

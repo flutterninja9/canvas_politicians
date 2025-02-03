@@ -9,7 +9,7 @@ class NativeEditorController {
   final BuildContext context;
   final Function(String) onError;
   final Function(Map<String, dynamic>) onStateChanged;
-  
+
   bool _canUndo = false;
   bool _canRedo = false;
 
@@ -33,18 +33,14 @@ class NativeEditorController {
   }) async {
     try {
       await webViewController.evaluateJavascript(source: '''
-        methodChannel.handleMessage({
-          type: 'setText',
-          data: {
-            text: '$text',
-            fontSize: ${fontSize ?? 24},
-            color: '${color ?? '#000000'}',
-            fontFamily: '${fontFamily ?? 'Arial'}',
-            x: ${x ?? 100},
-            y: ${y ?? 100}
-          }
-        });
-      ''');
+  editor.addText('$text', {
+    fontSize: ${fontSize ?? 24},
+    color: '${color ?? '#000000'}',
+    fontFamily: '${fontFamily ?? 'Arial'}',
+    left: ${x ?? 100},
+    top: ${y ?? 100}
+  });
+''');
     } catch (e) {
       onError('Failed to add text: $e');
     }
@@ -54,12 +50,12 @@ class NativeEditorController {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      
+
       if (image != null) {
         // In a real app, you'd upload this image to your server first
         // Here we're using it directly for demo purposes
         await webViewController.evaluateJavascript(source: '''
-          methodChannel.handleMessage({
+          editor.addImage({
             type: 'setImage',
             data: {
               url: '${image.path}',
@@ -108,8 +104,7 @@ class NativeEditorController {
     if (!_canUndo) return;
     try {
       await webViewController.evaluateJavascript(
-        source: "methodChannel.handleMessage({type: 'undo'});"
-      );
+          source: "methodChannel.handleMessage({type: 'undo'});");
     } catch (e) {
       onError('Failed to undo: $e');
     }
@@ -119,8 +114,7 @@ class NativeEditorController {
     if (!_canRedo) return;
     try {
       await webViewController.evaluateJavascript(
-        source: "methodChannel.handleMessage({type: 'redo'});"
-      );
+          source: "methodChannel.handleMessage({type: 'redo'});");
     } catch (e) {
       onError('Failed to redo: $e');
     }

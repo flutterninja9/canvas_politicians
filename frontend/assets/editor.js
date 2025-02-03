@@ -54,6 +54,7 @@ class EditorMethodChannel {
 
     // Handler implementations
     setText(data) {
+        console.log(data);
         editor.addElement({
             type: 'text',
             id: Date.now().toString(),
@@ -73,6 +74,7 @@ class EditorMethodChannel {
                 rotation: data.rotation || 0
             }
         });
+        console.log(editor.elements);
         this.addToHistory(editor.getState());
     }
 
