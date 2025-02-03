@@ -12,7 +12,8 @@ class TemplatePreviewScreen extends StatelessWidget {
   });
 
   Future<Uint8List?> _getUpdatedImageBytes() async {
-    return Uint8List.fromList(await apiService.generatePreviewImage(templateId, editedJson));
+    return Uint8List.fromList(
+        await apiService.generatePreviewImage(templateId, editedJson));
   }
 
   @override
@@ -28,18 +29,25 @@ class TemplatePreviewScreen extends StatelessWidget {
           if (snapshot.hasError) {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
-          if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
+          if (!snapshot.hasData ||
+              snapshot.data == null ||
+              snapshot.data!.isEmpty) {
             return const Center(child: Text("No preview available"));
           }
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.memory(snapshot.data!), // Display image from bytes
+              SizedBox(
+                height: 400,
+                width: 499,
+                child: Image.memory(
+                  snapshot.data!,
+                  fit: BoxFit.contain,
+                ),
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
-                  // Implement the action after preview (like saving or editing further)
-                },
+                onPressed: () {},
                 child: const Text("Save Changes"),
               ),
             ],

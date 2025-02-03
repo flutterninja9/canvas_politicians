@@ -39,6 +39,17 @@ def upload_image(request):
 
 @csrf_exempt
 def generate_template_preview(request, template_id):
+    if request.method == 'POST':
+        try:
+            # Parse the request body
+            data = json.loads(request.body)
+            edited_json = data.get('edited_json', {})
+            elements = edited_json.get('editable_elements', [])
+        except json.JSONDecodeError:
+            return HttpResponse("Invalid JSON data", status=400)
+    else:
+        return HttpResponse("Method not allowed", status=405)
+
     template = get_object_or_404(Template, id=template_id)
     
     # Load background image
@@ -53,25 +64,22 @@ def generate_template_preview(request, template_id):
     element_layer = Image.new('RGBA', (template.canvas_width, template.canvas_height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(element_layer)
 
-    try:
-        font = ImageFont.truetype("arial.ttf", 48)
-    except:
-        font = ImageFont.load_default()
-
-    elements = template.elements.all().order_by('z_index')
+    # Sort elements by z-index
+    elements.sort(key=lambda x: x.get('z_index', 0))
     
     for element in elements:
-        box = element.box
+        box = element['box']
+        element_type = element['type']
         
-        # Use pixel values directly
-        box_x = box.x
-        box_y = box.y
-        box_width = box.width
-        box_height = box.height
+        # Get box coordinates
+        box_x = int(box['x'])
+        box_y = int(box['y'])
+        box_width = int(box['width'])
+        box_height = int(box['height'])
         
-        if element.element_type == "text":
-            text = element.content.get("text", "")
-            font_size = element.style.get("font_size", 48)
+        if element_type == "text":
+            text = element['content'].get('text', '')
+            font_size = int(element['style'].get('font_size', 48))
             try:
                 font = ImageFont.truetype("arial.ttf", font_size)
             except:
@@ -83,9 +91,9 @@ def generate_template_preview(request, template_id):
             text_height = bbox[3] - bbox[1]
             
             # Calculate text position based on box alignment
-            if box.alignment == "center":
+            if box['alignment'] == "center":
                 text_x = box_x + (box_width - text_width) // 2
-            elif box.alignment == "right":
+            elif box['alignment'] == "right":
                 text_x = box_x + box_width - text_width
             else:  # left alignment
                 text_x = box_x
@@ -94,26 +102,35 @@ def generate_template_preview(request, template_id):
             text_y = box_y + (box_height - text_height) // 2
             
             # Draw text
-            color = element.style.get("color", "#000000")
-            rgb_color = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
+            color = element['style'].get('color', '#000000')
+            # Remove the '#' and convert to RGB
+            color = color.lstrip('#')
+            rgb_color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
             draw.text((text_x, text_y), text, fill=rgb_color, font=font)
         
-        elif element.element_type == "image":
-            # Handle image elements
-            image_url = element.content.get("url")
+        elif element_type == "image":
+            image_url = element['content'].get('url')
             if image_url:
                 try:
                     response = requests.get(image_url)
                     if response.status_code == 200:
                         element_image = Image.open(BytesIO(response.content))
                         element_image = element_image.resize((box_width, box_height), Image.Resampling.LANCZOS)
-                        element_layer.paste(element_image, (box_x, box_y))
+                        
+                        # Convert element_image to RGBA if it isn't already
+                        if element_image.mode != 'RGBA':
+                            element_image = element_image.convert('RGBA')
+                            
+                        element_layer.paste(element_image, (box_x, box_y), element_image)
                 except Exception as e:
                     print(f"Error processing image element: {e}")
 
     # Composite the element layer onto the background
     final_image = Image.alpha_composite(bg_image.convert('RGBA'), element_layer)
+    
+    # Save image to buffer
     img_io = BytesIO()
-    final_image.save(img_io, "PNG")
+    final_image.save(img_io, format='PNG')
     img_io.seek(0)
+    
     return HttpResponse(img_io.getvalue(), content_type="image/png")
