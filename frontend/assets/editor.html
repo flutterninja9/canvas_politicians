@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Editor</title>
+    
+    <!-- Import Fabric.js and Feather Icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background: #f0f0f0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        #editor-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .canvas-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-button {
+            padding: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .control-button:hover {
+            background: #f5f5f5;
+            color: #000;
+        }
+
+        .zoom-level {
+            padding: 8px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            border-left: 1px solid #eee;
+            border-right: 1px solid #eee;
+            margin: 0 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor-container">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div class="canvas-controls">
+            <button class="control-button" onclick="editor.zoomIn()">
+                <i data-feather="zoom-in"></i>
+            </button>
+            <button class="control-button" onclick="editor.zoomOut()">
+                <i data-feather="zoom-out"></i>
+            </button>
+            <span class="zoom-level">100%</span>
+            <button class="control-button" onclick="editor.resetZoom()">
+                <i data-feather="maximize"></i>
+                Fit
+            </button>
+            <button class="control-button" onclick="editor.deleteSelected()">
+                <i data-feather="trash-2"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class Editor {
+            constructor() {
+                this.canvas = new fabric.Canvas('canvas', {
+                    backgroundColor: 'white',
+                    preserveObjectStacking: true,
+                    width: 1080,
+                    height: 1920
+                });
+                
+                this.zoom = 1;
+                this.setupEventListeners();
+                this.initializeFeather();
+                this.adjustCanvasSize();
+                
+                // Initialize with some default settings
+                this.canvas.selection = true;
+                this.canvas.renderAll();
+            }
+
+            initializeFeather() {
+                feather.replace();
+            }
+
+            adjustCanvasSize() {
+                const container = document.getElementById('editor-container');
+                const padding = 40;
+                const maxWidth = container.clientWidth - padding;
+                const maxHeight = container.clientHeight - padding;
+                
+                const canvasRatio = this.canvas.width / this.canvas.height;
+                const containerRatio = maxWidth / maxHeight;
+                
+                let scale;
+                if (containerRatio > canvasRatio) {
+                    scale = maxHeight / this.canvas.height;
+                } else {
+                    scale = maxWidth / this.canvas.width;
+                }
+                
+                this.canvas.setZoom(scale);
+                this.zoom = scale;
+                
+                this.updateZoomLevel();
+            }
+
+            setupEventListeners() {
+                // Handle window resize
+                window.addEventListener('resize', () => this.adjustCanvasSize());
+
+                // Handle object selection
+                this.canvas.on('selection:created', (e) => this.onObjectSelected(e));
+                this.canvas.on('selection:cleared', () => this.onSelectionCleared());
+
+                // Handle object modification
+                this.canvas.on('object:modified', () => this.onObjectModified());
+            }
+
+            addText(text, options = {}) {
+                const textObject = new fabric.IText(text, {
+                    left: this.canvas.width / 2,
+                    top: this.canvas.height / 2,
+                    fontFamily: options.fontFamily || 'Arial',
+                    fontSize: options.fontSize || 40,
+                    fill: options.color || '#000000',
+                    textAlign: options.textAlign || 'center',
+                    originX: 'center',
+                    originY: 'center'
+                });
+
+                this.canvas.add(textObject);
+                this.canvas.setActiveObject(textObject);
+                this.canvas.renderAll();
+                
+                this.notifyFlutter('elementAdded', {
+                    type: 'text',
+                    id: textObject.id
+                });
+            }
+
+            addImage(url, options = {}) {
+                fabric.Image.fromURL(url, (img) => {
+                    img.set({
+                        left: this.canvas.width / 2,
+                        top: this.canvas.height / 2,
+                        originX: 'center',
+                        originY: 'center',
+                        ...options
+                    });
+
+                    // Scale image to reasonable size if needed
+                    const maxSize = 300;
+                    if (img.width > maxSize || img.height > maxSize) {
+                        const scale = maxSize / Math.max(img.width, img.height);
+                        img.scale(scale);
+                    }
+
+                    this.canvas.add(img);
+                    this.canvas.setActiveObject(img);
+                    this.canvas.renderAll();
+                    
+                    this.notifyFlutter('elementAdded', {
+                        type: 'image',
+                        id: img.id,
+                        url: url
+                    });
+                });
+            }
+
+            deleteSelected() {
+                const activeObject = this.canvas.getActiveObject();
+                if (activeObject) {
+                    this.canvas.remove(activeObject);
+                    this.notifyFlutter('elementDeleted', {
+                        id: activeObject.id
+                    });
+                }
+            }
+
+            zoomIn() {
+                this.zoom *= 1.1;
+                this.canvas.setZoom(this.zoom);
+                this.updateZoomLevel();
+            }
+
+            zoomOut() {
+                this.zoom *= 0.9;
+                this.canvas.setZoom(this.zoom);
+                this.updateZoomLevel();
+            }
+
+            resetZoom() {
+                this.adjustCanvasSize();
+            }
+
+            updateZoomLevel() {
+                const zoomPercent = Math.round(this.zoom * 100);
+                document.querySelector('.zoom-level').textContent = `${zoomPercent}%`;
+            }
+
+            getState() {
+                return {
+                    objects: this.canvas.toJSON(),
+                    zoom: this.zoom,
+                    width: this.canvas.width,
+                    height: this.canvas.height
+                };
+            }
+
+            setState(state) {
+                this.canvas.loadFromJSON(state.objects, () => {
+                    this.canvas.renderAll();
+                });
+            }
+
+            notifyFlutter(type, data) {
+                if (window.flutter_inappwebview) {
+                    window.flutter_inappwebview.callHandler('flutterHandler', {
+                        type: type,
+                        data: data
+                    });
+                }
+            }
+
+            onObjectSelected(e) {
+                const object = e.selected[0];
+                this.notifyFlutter('elementSelected', {
+                    id: object.id,
+                    type: object.type,
+                    properties: this.getObjectProperties(object)
+                });
+            }
+
+            onSelectionCleared() {
+                this.notifyFlutter('selectionCleared', {});
+            }
+
+            onObjectModified() {
+                const object = this.canvas.getActiveObject();
+                if (object) {
+                    this.notifyFlutter('elementModified', {
+                        id: object.id,
+                        properties: this.getObjectProperties(object)
+                    });
+                }
+            }
+
+            getObjectProperties(object) {
+                const props = {
+                    left: object.left,
+                    top: object.top,
+                    width: object.width * object.scaleX,
+                    height: object.height * object.scaleY,
+                    angle: object.angle
+                };
+
+                if (object.type === 'text') {
+                    props.text = object.text;
+                    props.fontSize = object.fontSize;
+                    props.fontFamily = object.fontFamily;
+                    props.fill = object.fill;
+                    props.textAlign = object.textAlign;
+                }
+
+                return props;
+            }
+        }
+
+        // Initialize editor
+        const editor = new Editor();
+
+        // Handle messages from Flutter
+        window.addEventListener('message', function(event) {
+            const message = event.data;
+            switch (message.type) {
+                case 'addText':
+                    editor.addText(message.data.text, message.data);
+                    break;
+                case 'addImage':
+                    editor.addImage(message.data.url, message.data);
+                    break;
+                case 'getState':
+                    const state = editor.getState();
+                    editor.notifyFlutter('editorState', state);
+                    break;
+                case 'setState':
+                    editor.setState(message.data);
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

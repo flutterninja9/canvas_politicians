@@ -1,48 +1,16 @@
-// lib/screens/template_list_screen.dart
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'template_edit_screen.dart';  // Old editor
-import 'web_template_editor.dart';   // New web-based editor
+import 'package:frontend/widgets/native_editor.dart';
 import '../providers/template_provider.dart';
 
 class TemplateListScreen extends ConsumerWidget {
   const TemplateListScreen({super.key});
 
   void _navigateToEditor(BuildContext context, Map<String, dynamic> template) {
-    // For now, let's add a choice dialog to test both editors
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Editor'),
-        content: const Text('Which editor would you like to use?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TemplateEditScreen(template: template),
-                ),
-              );
-            },
-            child: const Text('Original Editor'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => WebTemplateEditor(template: template),
-                ),
-              );
-            },
-            child: const Text('New Web Editor'),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NativeEditor(template: template),
       ),
     );
   }
@@ -66,15 +34,7 @@ class TemplateListScreen extends ConsumerWidget {
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) {
-          if (err is DioException) {
-            print((err.requestOptions.uri.toString()));
-            print((_.toString()));
-          }
-          print((err.toString()));
-          print((_.toString()));
-          return const Center(child: Text("Error loading templates"));
-        },
+        error: (err, _) => const Center(child: Text("Error loading templates")),
       ),
     );
   }

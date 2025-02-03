@@ -31,6 +31,17 @@
 
   <title>frontend</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Handle messages from Flutter
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type) {
+        const editorFrame = document.querySelector('iframe[src*="editor.html"]');
+        if (editorFrame) {
+          editorFrame.contentWindow.postMessage(event.data, '*');
+        }
+      }
+    });
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
