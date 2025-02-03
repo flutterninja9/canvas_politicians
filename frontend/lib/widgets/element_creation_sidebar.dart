@@ -1,17 +1,64 @@
+// lib/widgets/element_creation_sidebar.dart
+
 import 'package:flutter/material.dart';
-import 'package:frontend/utils/image_upload_dialog.dart';
+import '../models/template_types.dart';
+import '../utils/image_upload_dialog.dart';
 
 class ElementCreationSidebar extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
-  final Function(Map<String, dynamic>) onCreateElement;
+  final Function(TemplateElement) onCreateElement;
+  final Size viewportSize;
 
   const ElementCreationSidebar({
     super.key,
     required this.isExpanded,
     required this.onToggle,
     required this.onCreateElement,
+    required this.viewportSize,
   });
+
+  TemplateElement _createTextElement({
+    required String text,
+    required double fontSizeVw,
+    required String type,
+  }) {
+    return TemplateElement(
+      type: 'text',
+      box: TemplateBox(
+        xPercent: 10,
+        yPercent: 10,
+        widthPercent: 80,
+        heightPercent: 10,
+        alignment: 'center',
+      ),
+      content: {'text': text},
+      style: TemplateStyle(
+        fontSizeVw: fontSizeVw,
+        color: '#000000',
+      ),
+    );
+  }
+
+  TemplateElement _createImageElement() {
+    return TemplateElement(
+      type: 'image',
+      box: TemplateBox(
+        xPercent: 10,
+        yPercent: 10,
+        widthPercent: 30,
+        heightPercent: 30,
+        alignment: 'center',
+      ),
+      content: {
+        'url': 'https://via.placeholder.com/200x200',
+      },
+      style: TemplateStyle(
+        fontSizeVw: 0,
+        color: '#000000',
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +77,6 @@ class ElementCreationSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Toggle button
           ListTile(
             contentPadding:
                 EdgeInsets.symmetric(horizontal: isExpanded ? 16 : 8),
@@ -53,79 +99,47 @@ class ElementCreationSidebar extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                 ],
-                _buildDraggableElement(
+                _buildElementButton(
                   context: context,
                   icon: Icons.title,
                   label: 'Heading',
-                  isExpanded: isExpanded,
-                  element: {
-                    'type': 'text',
-                    'content': {'text': 'New Heading'},
-                    'style': {
-                      'font_size': 32.0,
-                      'color': '#000000',
-                    },
-                    'box': {
-                      'x': 100.0,
-                      'y': 100.0,
-                      'width': 300.0,
-                      'height': 50.0,
-                      'alignment': 'center',
-                    },
-                  },
-                  onCreateElement: onCreateElement,
+                  onTap: () => onCreateElement(_createTextElement(
+                    text: 'New Heading',
+                    fontSizeVw: 6.0,
+                    type: 'heading',
+                  )),
                 ),
                 const SizedBox(height: 8),
-                _buildDraggableElement(
+                _buildElementButton(
                   context: context,
                   icon: Icons.text_fields,
                   label: 'Body Text',
-                  isExpanded: isExpanded,
-                  element: {
-                    'type': 'text',
-                    'content': {'text': 'New Text Block'},
-                    'style': {
-                      'font_size': 16.0,
-                      'color': '#000000',
-                    },
-                    'box': {
-                      'x': 100.0,
-                      'y': 100.0,
-                      'width': 200.0,
-                      'height': 100.0,
-                      'alignment': 'left',
-                    },
-                  },
-                  onCreateElement: onCreateElement,
+                  onTap: () => onCreateElement(_createTextElement(
+                    text: 'New Text Block',
+                    fontSizeVw: 4.0,
+                    type: 'body',
+                  )),
                 ),
-                const SizedBox(height: 16),
                 if (isExpanded) ...[
+                  const SizedBox(height: 16),
                   Text(
                     'Media Elements',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
                 ],
-                _buildDraggableElement(
+                _buildElementButton(
                   context: context,
                   icon: Icons.image,
                   label: 'Image',
-                  isExpanded: isExpanded,
-                  element: {
-                    'type': 'image',
-                    'content': {
-                      'url': 'https://via.placeholder.com/200x200',
-                    },
-                    'style': {},
-                    'box': {
-                      'x': 100.0,
-                      'y': 100.0,
-                      'width': 200.0,
-                      'height': 200.0,
-                      'alignment': 'center',
-                    },
+                  onTap: () async {
+                    final url = await showImageUploadDialog(context);
+                    if (url != null) {
+                      final element = _createImageElement();
+                      element.content['url'] = url;
+                      onCreateElement(element);
+                    }
                   },
-                  onCreateElement: onCreateElement,
                 ),
               ],
             ),
@@ -135,56 +149,14 @@ class ElementCreationSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildDraggableElement({
+  Widget _buildElementButton({
     required BuildContext context,
     required IconData icon,
     required String label,
-    required bool isExpanded,
-    required Map<String, dynamic> element,
-    required Function(Map<String, dynamic>) onCreateElement,
+    required VoidCallback onTap,
   }) {
-    if (element['type'] == 'image') {
-      return InkWell(
-        onTap: () async {
-          final url = await showImageUploadDialog(context);
-          print('Image URL: $url');
-          if (url != null) {
-            final newElement = Map<String, dynamic>.from(element);
-            newElement['content']['url'] = url;
-            onCreateElement(newElement);
-          }
-        },
-        child: Container(
-          padding: EdgeInsets.all(isExpanded ? 12 : 8),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24),
-              if (isExpanded) ...[
-                const SizedBox(width: 12),
-                Expanded(child: Text(label)),
-              ],
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Draggable<Map<String, dynamic>>(
-      data: element,
-      feedback: Material(
-        elevation: 4,
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Icon(icon),
-        ),
-      ),
+    return InkWell(
+      onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(isExpanded ? 12 : 8),
         decoration: BoxDecoration(
