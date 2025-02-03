@@ -84,22 +84,24 @@ class TemplatePreviewScreen extends StatelessWidget {
                       return const Text("No preview available");
                     }
 
-                    return Container(
-                      width: previewSize.width,
-                      height: previewSize.height,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Image.memory(
-                        snapshot.data!,
-                        fit: BoxFit.contain,
+                    return Expanded(
+                      child: Container(
+                        width: previewSize.width,
+                        height: previewSize.height,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Image.memory(
+                          snapshot.data!,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     );
                   },

@@ -299,9 +299,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                 PropertySidebar(
                   element: selectedElement!,
                   viewportSize: _viewportSize,
-                  onUpdate: () => setState(() {
-                    selectedElement = null;
-                  }),
+                  onUpdate: () => setState(() {}),
                 ),
             ],
           );
